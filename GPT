@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dicionário Vocabular com Geração Completa de Frase</title>
+  <style>
+    /* CSS */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f8f9fa;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      text-align: center;
+      color: #333;
+    }
+    .section {
+      margin: 20px 0;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px 5px;
+      border: none;
+      border-radius: 4px;
+      background-color: #007bff;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .result, .prediction, .candidateResult, .fullSentence {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #e2f0d9;
+      border: 1px solid #c3e6cb;
+      border-radius: 4px;
+      white-space: pre-wrap;
+    }
+    .info {
+      background-color: #f1f1f1;
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 0.9em;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Dicionário Vocabular com Geração Completa de Frase</h1>
+    <div class="section">
+      <p>
+        Este exemplo utiliza um dicionário vocabular com embeddings pré-definidos e destilação teacher para ajustar os vetores com base em um contexto aleatório.  
+        Além disso, é aplicado um algoritmo heurístico que gera uma palavra candidata (ação) e, por fim, utiliza conectores simples para gerar uma frase completa com sentido.
+      </p>
+      <p class="info">
+        O fluxo é o seguinte:  
+        1. Gerar um contexto aleatório (3 palavras do vocabulário).  
+        2. Selecionar uma palavra alvo (para o treinamento e previsão via embeddings).  
+        3. Executar o treinamento e prever a palavra alvo (por embeddings).  
+        4. Gerar uma palavra candidata (ação) usando uma heurística.  
+        5. Gerar uma frase completa usando a estrutura:  
+        "Na [contexto_1], o [contexto_2] e o [contexto_3] [ação] sob o [target]."
+      </p>
+    </div>
+    
+    <div class="section">
+      <button id="generateContextBtn">Gerar Contexto Aleatório</button>
+      <button id="trainBtn">Executar Treinamento</button>
+      <button id="predictBtn">Prever Palavra (Embedding)</button>
+      <button id="generateCandidateBtn">Gerar Palavra Candidata</button>
+      <button id="generateFullSentenceBtn">Gerar Frase Completa</button>
+    </div>
+    
+    <div class="section">
+      <h2>Vocabulário</h2>
+      <div id="vocabArea" class="info"></div>
+    </div>
+    
+    <div class="section">
+      <h2>Contexto Atual</h2>
+      <div id="contextArea" class="info"></div>
+    </div>
+    
+    <div class="section">
+      <h2>Treinamento</h2>
+      <div id="trainingLog" class="result"></div>
+    </div>
+    
+    <div class="section">
+      <h2>Previsão (Embedding)</h2>
+      <div id="predictionArea" class="result"></div>
+    </div>
+    
+    <div class="section">
+      <h2>Palavra Candidata Gerada</h2>
+      <div id="candidateArea" class="candidateResult"></div>
+    </div>
+    
+    <div class="section">
+      <h2>Frase Completa Gerada</h2>
+      <div id="fullSentenceArea" class="fullSentence"></div>
+    </div>
+  </div>
+
+  <script>
+    // JavaScript – Dicionário Vocabular com Embeddings, Treinamento, Geração de Palavra Candidata e Frase Completa
+
+    // 1. Dicionário vocabular com embeddings pré-definidos (5 dimensões)
+    const vocabDict = {
+      "cachorro": [0.8, 0.1, 0.2, 0.0, 0.0],
+      "gato":     [0.7, 0.15, 0.25, 0.0, 0.0],
+      "casa":     [0.1, 0.8, 0.0, 0.0, 0.1],
+      "carro":    [0.1, 0.75, 0.0, 0.1, 0.0],
+      "árvore":   [0.2, 0.1, 0.8, 0.0, 0.0],
+      "flor":     [0.2, 0.1, 0.7, 0.0, 0.0],
+      "sol":      [0.0, 0.0, 0.1, 0.8, 0.1],
+      "lua":      [0.0, 0.0, 0.1, 0.75, 0.2],
+      "mar":      [0.1, 0.0, 0.2, 0.0, 0.8],
+      "rio":      [0.1, 0.0, 0.2, 0.0, 0.75]
+    };
+
+    // Exibe o vocabulário
+    const vocab = Object.keys(vocabDict);
+    document.getElementById('vocabArea').textContent = vocab.join(', ');
+
+    // 2. Inicializa os embeddings do estudante (cópia dos vetores do dicionário)
+    const embeddings = {};
+    for (const word of vocab) {
+      embeddings[word] = vocabDict[word].slice();
+    }
+
+    // 3. Cria o conjunto de embeddings do teacher (fixos)
+    const teacherEmbeddings = {};
+    for (const word of vocab) {
+      teacherEmbeddings[word] = vocabDict[word].slice();
+    }
+
+    // 4. Função para calcular o produto escalar entre dois vetores
+    function dot(a, b) {
+      let sum = 0;
+      for (let i = 0; i < a.length; i++) {
+        sum += a[i] * b[i];
+      }
+      return sum;
+    }
+
+    // 5. Função para somar um array de vetores (vetor do contexto)
+    function sumVectors(vectors) {
+      const dim = vectors[0].length;
+      const sum = new Array(dim).fill(0);
+      vectors.forEach(vec => {
+        for (let i = 0; i < dim; i++) {
+          sum[i] += vec[i];
+        }
+      });
+      return sum;
+    }
+
+    // 6. Função de perda: negativa do produto escalar entre o vetor do contexto e o vetor alvo
+    function loss(contextVec, targetVec) {
+      return -dot(contextVec, targetVec);
+    }
+
+    // 7. Configurações do treinamento
+    const lr = 0.01;    // Taxa de aprendizado
+    const lambda = 0.1; // Peso da perda de distilação
+
+    // 8. Variáveis para armazenar o contexto e a palavra alvo selecionados
+    let currentContext = []; // Array de palavras
+    let targetWord = null;
+    let predictedEmbeddingResult = "";
+    let candidateActionResult = "";
+
+    // Função para gerar um contexto aleatório: escolhe 3 palavras distintas
+    function generateRandomContext() {
+      currentContext = [];
+      const indices = [];
+      while (indices.length < 3) {
+        const idx = Math.floor(Math.random() * vocab.length);
+        if (!indices.includes(idx)) indices.push(idx);
+      }
+      indices.forEach(idx => currentContext.push(vocab[idx]));
+      document.getElementById('contextArea').textContent = currentContext.join(', ');
+    }
+
+    // Função para selecionar uma palavra alvo aleatória (preferencialmente não no contexto)
+    function selectRandomTarget() {
+      const possibleTargets = vocab.filter(word => !currentContext.includes(word));
+      if (possibleTargets.length === 0) {
+        targetWord = vocab[Math.floor(Math.random() * vocab.length)];
+      } else {
+        targetWord = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
+      }
+      console.log("Palavra alvo selecionada:", targetWord);
+    }
+
+    // 9. Função para executar um passo de treinamento com destilação teacher
+    function trainStep(context, target) {
+      let contextVec = sumVectors(context.map(word => embeddings[word]));
+      let targetVec = embeddings[target];
+      let currentLoss = loss(contextVec, targetVec);
+
+      for (let i = 0; i < targetVec.length; i++) {
+        let grad_original = -contextVec[i];
+        let grad_teacher = 2 * (targetVec[i] - teacherEmbeddings[target][i]);
+        embeddings[target][i] -= lr * (grad_original + lambda * grad_teacher);
+      }
+
+      contextVec = sumVectors(context.map(word => embeddings[word]));
+      let newLoss = loss(contextVec, embeddings[target]);
+      return { currentLoss, newLoss };
+    }
+
+    // 10. Função para prever a próxima palavra com base no contexto (usando similaridade)
+    function predictNextWord(context) {
+      let contextVec = sumVectors(context.map(word => embeddings[word]));
+      let bestWord = null;
+      let bestScore = -Infinity;
+      vocab.forEach(word => {
+        let score = dot(contextVec, embeddings[word]);
+        if (score > bestScore) {
+          bestScore = score;
+          bestWord = word;
+        }
+      });
+      return bestWord;
+    }
+
+    // 11. Função para gerar uma palavra candidata (ação) usando as letras do contexto e um componente aleatório
+    function generateCandidateAction(context) {
+      let contextStr = context.join("").toLowerCase();
+      const candidateActions = ["passear", "navegar", "viajar", "curtir", "explorar", "descansar"];
+      let bestScore = -Infinity;
+      let bestCandidate = "";
+      candidateActions.forEach(candidate => {
+        let score = 0;
+        candidate.split("").forEach(letter => {
+          if (contextStr.includes(letter)) {
+            score++;
+          }
+        });
+        score += Math.random();
+        if (score > bestScore) {
+          bestScore = score;
+          bestCandidate = candidate;
+        }
+      });
+      return bestCandidate;
+    }
+
+    // 12. Função para gerar uma frase completa com conectores e sentido
+    function generateFullSentence() {
+      // Para a construção da frase, usamos:
+      // - Os 3 elementos do contexto (assumidos como substantivos)
+      // - A palavra candidata (ação) gerada
+      // - O target previsto (por embeddings)
+      // Exemplo de padrão: "Na [contexto_1], o [contexto_2] e o [contexto_3] [ação] sob o [target]."
+      if (currentContext.length < 3 || !candidateActionResult || !predictedEmbeddingResult) {
+        alert("Certifique-se de gerar o contexto, executar treinamento/pré-visualização e gerar a palavra candidata antes.");
+        return;
+      }
+      // Obter os 3 elementos do contexto
+      const [elem1, elem2, elem3] = currentContext;
+      // Gera a frase completa usando conectores simples
+      const sentence = `Na ${elem1}, o ${elem2} e o ${elem3} ${candidateActionResult} sob o ${predictedEmbeddingResult}.`;
+      document.getElementById('fullSentenceArea').textContent = sentence;
+    }
+
+    // Eventos dos botões
+    document.getElementById('generateContextBtn').addEventListener('click', () => {
+      generateRandomContext();
+      selectRandomTarget();
+      document.getElementById('trainingLog').textContent = "";
+      document.getElementById('predictionArea').textContent = "";
+      document.getElementById('candidateArea').textContent = "";
+      document.getElementById('fullSentenceArea').textContent = "";
+      // Limpa os resultados armazenados
+      predictedEmbeddingResult = "";
+      candidateActionResult = "";
+    });
+
+    document.getElementById('trainBtn').addEventListener('click', () => {
+      if (currentContext.length === 0) {
+        alert("Gere primeiro um contexto aleatório.");
+        return;
+      }
+      if (!targetWord) {
+        alert("Selecione uma palavra alvo.");
+        return;
+      }
+      let log = `Palavra alvo: ${targetWord}\nContexto: ${currentContext.join(', ')}\n\n`;
+      for (let i = 0; i < 100; i++) {
+        const { currentLoss, newLoss } = trainStep(currentContext, targetWord);
+        log += `Iteração ${i+1}: Loss antes = ${currentLoss.toFixed(4)}, Loss depois = ${newLoss.toFixed(4)}\n`;
+      }
+      document.getElementById('trainingLog').textContent = log;
+    });
+
+    document.getElementById('predictBtn').addEventListener('click', () => {
+      if (currentContext.length === 0) {
+        alert("Gere primeiro um contexto aleatório.");
+        return;
+      }
+      predictedEmbeddingResult = predictNextWord(currentContext);
+      document.getElementById('predictionArea').textContent = "Palavra prevista para o contexto (por embeddings): " + predictedEmbeddingResult;
+    });
+
+    document.getElementById('generateCandidateBtn').addEventListener('click', () => {
+      if (currentContext.length === 0) {
+        alert("Gere primeiro um contexto aleatório.");
+        return;
+      }
+      candidateActionResult = generateCandidateAction(currentContext);
+      document.getElementById('candidateArea').textContent = "Palavra candidata (construída a partir do contexto): " + candidateActionResult;
+    });
+
+    document.getElementById('generateFullSentenceBtn').addEventListener('click', () => {
+      generateFullSentence();
+    });
+
+    // Inicializa com um contexto aleatório ao carregar a página
+    generateRandomContext();
+    selectRandomTarget();
+  </script>
+</body>
+</html>
