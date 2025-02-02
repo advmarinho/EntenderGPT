@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dicionário Vocabular com Geração Completa de Frase</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* CSS */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f8f9fa;
+      margin: 0;
+      padding: 20px;
+      padding-top: 60px;
+    }
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      text-align: center;
+      color: #333;
+    }
+    .section {
+      margin: 20px 0;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px 5px;
+      border: none;
+      border-radius: 4px;
+      background-color: #007bff;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .result, .prediction, .candidateResult, .fullSentence {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #e2f0d9;
+      border: 1px solid #c3e6cb;
+      border-radius: 4px;
+      white-space: pre-wrap;
+    }
+    .info {
+      background-color: #f1f1f1;
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 0.9em;
+      color: #555;
+    }
+    .button-active {
+      background-color: #28a745;
+      transform: scale(0.98);
+    }
+    .result-fade {
+      animation: fadeIn 0.5s;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .floating-buttons {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      z-index: 1000;
+      text-align: center;
+      display: none;
+      transition: transform 0.3s ease;
+    }
+    .floating-buttons.visible {
+      display: block;
+    }
+    .floating-buttons button {
+      margin: 5px;
+      font-size: 0.9em;
+    }
+    canvas {
+      margin-top: 20px;
+      background-color: white;
+      border-radius: 4px;
+      padding: 10px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .info ul {
+      margin-left: 20px;
+      margin-bottom: 15px;
+    }
+    .info ul ul {
+      margin-left: 30px;
+      margin-top: 5px;
+    }
+    .info h3 {
+      color: #2196F3;
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+    .info li {
+      margin-bottom: 5px;
+      line-height: 1.4;
+    }
+    .info strong {
+      color: #333;
+    }
+    .interactive-area {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .word-cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .word-card {
+      padding: 10px 20px;
+      background: #e3f2fd;
+      border: 2px solid #90caf9;
+      border-radius: 4px;
+      cursor: grab;
+      user-select: none;
+      transition: all 0.2s;
+    }
+    .word-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .word-card.dragging {
+      opacity: 0.5;
+      cursor: grabbing;
+    }
+    .experiment-zones {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .drop-zone {
+      flex: 1;
+      min-height: 150px;
+      border: 2px dashed #ccc;
+      border-radius: 8px;
+      padding: 10px;
+      transition: background-color 0.3s;
+    }
+    .drop-zone.drag-over {
+      background-color: #e8f5e9;
+      border-color: #81c784;
+    }
+    .sentence-completion {
+      margin: 20px 0;
+    }
+    .sentence-template {
+      font-size: 1.2em;
+      line-height: 2;
+    }
+    .blank-space {
+      display: inline-block;
+      width: 100px;
+      height: 30px;
+      border-bottom: 2px solid #2196F3;
+      margin: 0 5px;
+      vertical-align: middle;
+    }
+    .blank-space.filled {
+      background-color: #e3f2fd;
+      border-radius: 4px;
+      padding: 2px 8px;
+    }
+    .feedback {
+      margin-top: 20px;
+      padding: 10px;
+      border-radius: 4px;
+      display: none;
+    }
+    .feedback.success {
+      display: block;
+      background-color: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #81c784;
+    }
+    .feedback.error {
+      display: block;
+      background-color: #fbe9e7;
+      color: #c62828;
+      border: 1px solid #ff8a80;
+    }
+    .similarities-table {
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 20px;
+    }
+    .similarities-table table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .similarities-table th,
+    .similarities-table td {
+      padding: 8px;
+      text-align: left;
+      border: 1px solid #ddd;
+    }
+    .similarities-table th {
+      background-color: #f5f5f5;
+      font-weight: bold;
+    }
+    .similarities-table tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+  </style>
+</head>
+<body>
+  <div class="floating-buttons" id="floatingButtons">
+    <button id="generateContextBtnFloat">Gerar Contexto</button>
+    <button id="trainBtnFloat">Treinar</button>
+    <button id="predictBtnFloat">Prever</button>
+    <button id="generateCandidateBtnFloat">Gerar Candidata</button>
+    <button id="generateFullSentenceBtnFloat">Gerar Frase</button>
+  </div>
+  <div class="container">
+    <h1>Dicionário Vocabular com Geração Completa de Frase</h1>
+    <div class="section">
+      <p>
+        Este exemplo utiliza um dicionário vocabular com embeddings pré-definidos e destilação teacher para ajustar os vetores com base em um contexto aleatório.  
+        Além disso, é aplicado um algoritmo heurístico que gera uma palavra candidata (ação) e, por fim, utiliza conectores simples para gerar uma frase completa com sentido.
+      </p>
+      <p class="info">
+        O fluxo é o seguinte:  
+        1. Gerar um contexto aleatório (3 palavras do vocabulário).  
+        2. Selecionar uma palavra alvo (para o treinamento e previsão via embeddings).  
+        3. Executar o treinamento e prever a palavra alvo (por embeddings).  
+        4. Gerar uma palavra candidata (ação) usando uma heurística.  
+        5. Gerar uma frase completa usando a estrutura:  
+        "Na [contexto_1], o [contexto_2] e o [contexto_3] [ação] sob o [target]."
+      </p>
+    </div>
+    
+    <div class="section">
+      <button id="generateContextBtn">Gerar Contexto Aleatório</button>
+      <button id="trainBtn">Executar Treinamento</button>
+      <button id="predictBtn">Prever Palavra (Embedding)</button>
+      <button id="generateCandidateBtn">Gerar Palavra Candidata</button>
+      <button id="generateFullSentenceBtn">Gerar Frase Completa</button>
+    </div>
+    
+    <div class="section">
+      <h2>Vocabulário</h2>
+      <div id="vocabArea" class="info"></div>
+    </div>
+    
+    <div class="section">
+      <h2>Contexto Atual</h2>
+      <div id="contextArea" class="info"></div>
+    </div>
+    
+    <div class="section">
+      <h2>Treinamento</h2>
+      <div id="trainingLog" class="result"></div>
+      <canvas id="lossChart" width="400" height="200"></canvas>
+    </div>
+    
+    <div class="section">
+      <h2>Previsão (Embedding)</h2>
+      <div id="predictionArea" class="result"></div>
+    </div>
+    
+    <div class="section">
+      <h2>Palavra Candidata Gerada</h2>
+      <div id="candidateArea" class="candidateResult"></div>
+    </div>
+    
+    <div class="section">
+      <h2>Frase Completa Gerada</h2>
+      <div id="fullSentenceArea" class="fullSentence"></div>
+    </div>
+
+    <div class="section">
+      <h2>Como funciona o GPT?</h2>
+      <div class="info">
+        <p><strong>1. Embeddings:</strong> Cada palavra é convertida em um vetor numérico que captura seu significado.</p>
+        <p><strong>2. Contexto:</strong> O modelo considera várias palavras anteriores para entender o contexto.</p>
+        <p><strong>3. Atenção:</strong> Cada palavra do contexto recebe um peso de importância diferente.</p>
+        <p><strong>4. Previsão:</strong> Com base no contexto e nos pesos, o modelo prevê a próxima palavra mais provável.</p>
+        <p><strong>5. Treinamento:</strong> O modelo aprende ajustando os vetores para melhorar suas previsões.</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Aplicações no Mundo Real</h2>
+      <div class="info">
+        <h3>1. Processamento de Linguagem Natural (NLP)</h3>
+        <ul>
+          <li><strong>Chatbots:</strong> Da mesma forma que nosso modelo aprende relações entre palavras, chatbots como o GPT aprendem padrões de conversação para responder perguntas.</li>
+          <li><strong>Tradução:</strong> Sistemas como o Google Translate usam embeddings para entender o significado das palavras em diferentes idiomas.</li>
+        </ul>
+
+        <h3>2. Exemplos na Natureza</h3>
+        <ul>
+          <li><strong>Cérebro Humano:</strong> Nosso cérebro também cria "embeddings" naturais:
+            <ul>
+              <li>Quando vemos uma "maçã", associamos com "fruta", "vermelha", "doce"</li>
+              <li>Assim como nosso modelo associa "sol" com "lua" por serem corpos celestes</li>
+            </ul>
+          </li>
+          <li><strong>Aprendizado Animal:</strong> 
+            <ul>
+              <li>Cães aprendem a associar o som "passear" com a ação de sair</li>
+              <li>Pássaros associam certos sons com perigo ou comida</li>
+            </ul>
+          </li>
+        </ul>
+
+        <h3>3. Aplicações Práticas</h3>
+        <ul>
+          <li><strong>Educação:</strong> 
+            <ul>
+              <li>Sistemas de recomendação de conteúdo educacional</li>
+              <li>Avaliação automática de textos</li>
+              <li>Geração de exercícios personalizados</li>
+            </ul>
+          </li>
+          <li><strong>Medicina:</strong>
+            <ul>
+              <li>Análise de prontuários médicos</li>
+              <li>Identificação de padrões em diagnósticos</li>
+              <li>Sugestão de tratamentos baseados em casos similares</li>
+            </ul>
+          </li>
+          <li><strong>Meio Ambiente:</strong>
+            <ul>
+              <li>Análise de padrões climáticos</li>
+              <li>Previsão de eventos naturais</li>
+              <li>Estudo de comportamento animal</li>
+            </ul>
+          </li>
+        </ul>
+
+        <h3>4. Como Ensinar</h3>
+        <p>Para ensinar este conceito, podemos usar analogias:</p>
+        <ul>
+          <li><strong>Jogo de Associações:</strong> 
+            <ul>
+              <li>Peça para alunos associarem palavras relacionadas</li>
+              <li>Ex: "Quando digo 'chuva', que outras palavras vêm à mente?"</li>
+            </ul>
+          </li>
+          <li><strong>Exercício de Contexto:</strong>
+            <ul>
+              <li>Complete a frase: "Na floresta, o _____ canta e o _____ voa"</li>
+              <li>Explique como sabemos quais palavras fazem sentido</li>
+            </ul>
+          </li>
+          <li><strong>Experimento Prático:</strong>
+            <ul>
+              <li>Use cartões com palavras e peça para agrupar relacionadas</li>
+              <li>Mostre como o computador faz algo similar com números (embeddings)</li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Área de Experimentação</h2>
+      <div class="interactive-area">
+        <div class="word-cards-container">
+          <h3>Cartões de Palavras</h3>
+          <div id="wordCards" class="word-cards"></div>
+        </div>
+        
+        <div class="experiment-zones">
+          <div class="drop-zone" id="group1">
+            <h4>Grupo 1: Natureza</h4>
+          </div>
+          <div class="drop-zone" id="group2">
+            <h4>Grupo 2: Animais</h4>
+          </div>
+          <div class="drop-zone" id="group3">
+            <h4>Grupo 3: Lugares</h4>
+          </div>
+        </div>
+
+        <div class="sentence-completion">
+          <h3>Complete a Frase</h3>
+          <div class="sentence-template">
+            "Na <div class="blank-space" data-type="lugar">___</div>, 
+            o <div class="blank-space" data-type="animal">___</div> 
+            observa a <div class="blank-space" data-type="natureza">___</div>"
+          </div>
+        </div>
+
+        <button id="checkGroupsBtn">Verificar Grupos</button>
+        <button id="showEmbeddingsBtn">Mostrar Relações (Embeddings)</button>
+        <div id="feedbackArea" class="feedback"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // JavaScript – Dicionário Vocabular com Embeddings, Treinamento, Geração de Palavra Candidata e Frase Completa
+
+    // 1. Dicionário vocabular com embeddings pré-definidos (5 dimensões)
+    const vocabDict = {
+      "cachorro": [0.8, 0.1, 0.2, 0.0, 0.0],
+      "gato":     [0.7, 0.15, 0.25, 0.0, 0.0],
+      "casa":     [0.1, 0.8, 0.0, 0.0, 0.1],
+      "carro":    [0.1, 0.75, 0.0, 0.1, 0.0],
+      "árvore":   [0.2, 0.1, 0.8, 0.0, 0.0],
+      "flor":     [0.2, 0.1, 0.7, 0.0, 0.0],
+      "sol":      [0.0, 0.0, 0.1, 0.8, 0.1],
+      "lua":      [0.0, 0.0, 0.1, 0.75, 0.2],
+      "mar":      [0.1, 0.0, 0.2, 0.0, 0.8],
+      "rio":      [0.1, 0.0, 0.2, 0.0, 0.75],
+      "montanha": [0.3, 0.1, 0.7, 0.0, 0.2],
+      "jardim":   [0.2, 0.2, 0.7, 0.0, 0.1],
+      "parque":   [0.2, 0.3, 0.6, 0.0, 0.1],
+      "praia":    [0.1, 0.0, 0.2, 0.1, 0.8]
+    };
+
+    // Exibe o vocabulário
+    const vocab = Object.keys(vocabDict);
+    document.getElementById('vocabArea').textContent = vocab.join(', ');
+
+    // Log do vocabulário
+    console.log('%c== Dicionário de Vocabulário ==', 'color: #2196F3; font-weight: bold');
+    console.log('Vocabulário completo:', vocabDict);
+    console.log('Cada palavra possui um vetor de 5 dimensões representando suas características semânticas\n');
+
+    // 2. Cria o conjunto de embeddings do teacher (fixos)
+    const teacherEmbeddings = {};
+    for (const word of vocab) {
+      teacherEmbeddings[word] = vocabDict[word].slice();
+    }
+
+    // 3. Inicializa os embeddings do estudante (cópia dos vetores do dicionário)
+    const embeddings = {};
+    for (const word of vocab) {
+      embeddings[word] = vocabDict[word].slice();
+    }
+
+    // Log dos embeddings
+    console.log('%c== Sistema de Embeddings ==', 'color: #4CAF50; font-weight: bold');
+    console.log('Embeddings do estudante (inicial):', embeddings);
+    console.log('Embeddings do professor (fixo):', teacherEmbeddings);
+    console.log('Os embeddings são usados para aprender relações entre palavras\n');
+
+    // 4. Função para calcular o produto escalar entre dois vetores
+    function dot(a, b) {
+      let sum = 0;
+      for (let i = 0; i < a.length; i++) {
+        sum += a[i] * b[i];
+      }
+      return sum;
+    }
+
+    // 5. Função para somar um array de vetores (vetor do contexto)
+    function sumVectors(vectors) {
+      const dim = vectors[0].length;
+      const sum = new Array(dim).fill(0);
+      vectors.forEach(vec => {
+        for (let i = 0; i < dim; i++) {
+          sum[i] += vec[i];
+        }
+      });
+      return sum;
+    }
+
+    // 6. Função de perda: negativa do produto escalar entre o vetor do contexto e o vetor alvo
+    function loss(contextVec, targetVec) {
+      return -dot(contextVec, targetVec);
+    }
+
+    // 7. Configurações do treinamento
+    const lr = 0.01;    // Taxa de aprendizado
+    const lambda = 0.1; // Peso da perda de distilação
+
+    // 8. Variáveis para armazenar o contexto e a palavra alvo selecionados
+    let currentContext = []; // Array de palavras
+    let targetWord = null;
+    let predictedEmbeddingResult = "";
+    let candidateActionResult = "";
+
+    // Adicione esta variável no início do script
+    let lossChart = null;
+
+    // Função para gerar um contexto aleatório: escolhe 3 palavras distintas
+    function generateRandomContext() {
+      currentContext = [];
+      const indices = [];
+      while (indices.length < 3) {
+        const idx = Math.floor(Math.random() * vocab.length);
+        if (!indices.includes(idx)) indices.push(idx);
+      }
+      indices.forEach(idx => currentContext.push(vocab[idx]));
+      
+      console.log('%c== Contexto Gerado ==', 'color: #FF5722; font-weight: bold');
+      console.log('Palavras do contexto:', currentContext);
+      console.log('Estas palavras serão usadas para treinar e gerar frases\n');
+      
+      document.getElementById('contextArea').textContent = currentContext.join(', ');
+      
+      // Limpa o gráfico
+      if (lossChart) {
+        lossChart.destroy();
+        lossChart = null;
+      }
+    }
+
+    // Função para selecionar uma palavra alvo aleatória (preferencialmente não no contexto)
+    function selectRandomTarget() {
+      const possibleTargets = vocab.filter(word => !currentContext.includes(word));
+      if (possibleTargets.length === 0) {
+        targetWord = vocab[Math.floor(Math.random() * vocab.length)];
+      } else {
+        targetWord = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
+      }
+      console.log("Palavra alvo selecionada:", targetWord);
+    }
+
+    // 9. Função para executar um passo de treinamento com destilação teacher
+    function trainStep(context, target) {
+      console.log('%c== Passo de Treinamento ==', 'color: #9C27B0; font-weight: bold');
+      console.log('Contexto atual:', context);
+      console.log('Palavra alvo:', target);
+      
+      let contextVec = sumVectors(context.map(word => embeddings[word]));
+      console.log('Vetor do contexto:', contextVec);
+      
+      let targetVec = embeddings[target];
+      let currentLoss = loss(contextVec, targetVec);
+
+      console.log('Loss inicial:', currentLoss);
+
+      for (let i = 0; i < targetVec.length; i++) {
+        let grad_original = -contextVec[i];
+        let grad_teacher = 2 * (targetVec[i] - teacherEmbeddings[target][i]);
+        embeddings[target][i] -= lr * (grad_original + lambda * grad_teacher);
+      }
+
+      contextVec = sumVectors(context.map(word => embeddings[word]));
+      let newLoss = loss(contextVec, embeddings[target]);
+      
+      console.log('Loss após ajuste:', newLoss);
+      console.log('Melhoria:', currentLoss - newLoss, '\n');
+      
+      return { currentLoss, newLoss };
+    }
+
+    // 10. Função para prever a próxima palavra com base no contexto (usando similaridade)
+    function predictNextWord(context) {
+      console.log('%c== Previsão de Palavra ==', 'color: #795548; font-weight: bold');
+      console.log('Contexto para previsão:', context);
+      
+      let contextVec = sumVectors(context.map(word => embeddings[word]));
+      let bestWord = null;
+      let bestScore = -Infinity;
+      
+      let scores = {};
+      vocab.forEach(word => {
+        let score = dot(contextVec, embeddings[word]);
+        scores[word] = score;
+        if (score > bestScore) {
+          bestScore = score;
+          bestWord = word;
+        }
+      });
+      
+      console.log('Pontuações de similaridade:', scores);
+      console.log('Palavra mais similar:', bestWord, '\n');
+      
+      return bestWord;
+    }
+
+    // 11. Função para gerar uma palavra candidata (ação) usando as letras do contexto e um componente aleatório
+    function generateCandidateAction(context) {
+      console.log('%c== Geração de Palavra Candidata ==', 'color: #607D8B; font-weight: bold');
+      
+      let contextStr = context.join("").toLowerCase();
+      console.log('String do contexto:', contextStr);
+      
+      const candidateActions = [
+        "passear", "navegar", "viajar", "curtir", "explorar", "descansar",
+        "brincar", "correr", "pular", "dançar", "cantar", "relaxar",
+        "meditar", "observar", "contemplar", "admirar"
+      ];
+      
+      let scores = {};
+      let bestScore = -Infinity;
+      let bestCandidate = "";
+      
+      candidateActions.forEach(candidate => {
+        let score = 0;
+        candidate.split("").forEach(letter => {
+          if (contextStr.includes(letter)) {
+            score++;
+          }
+        });
+        score += Math.random();
+        scores[candidate] = score;
+        
+        if (score > bestScore) {
+          bestScore = score;
+          bestCandidate = candidate;
+        }
+      });
+      
+      console.log('Pontuações das ações:', scores);
+      console.log('Ação escolhida:', bestCandidate, '\n');
+      
+      return bestCandidate;
+    }
+
+    // 12. Função para gerar uma frase completa com conectores e sentido
+    function generateFullSentence() {
+      if (currentContext.length < 3 || !candidateActionResult || !predictedEmbeddingResult) {
+        alert("Certifique-se de gerar o contexto, executar treinamento/pré-visualização e gerar a palavra candidata antes.");
+        return;
+      }
+
+      const [elem1, elem2, elem3] = currentContext;
+      
+      // Sistema de conectores dinâmicos
+      const conectores = {
+        locais: ['Na', 'Próximo à', 'Perto da', 'Junto à', 'Em frente à', 'Ao lado da', 'Dentro da'],
+        temporais: ['Durante', 'Enquanto', 'Quando', 'Após', 'Antes de', 'No momento em que'],
+        conjuncoes: ['e', 'enquanto', 'mas', 'porém', 'quando'],
+        preposicoes: ['com', 'sob', 'sobre', 'entre', 'após', 'junto'],
+        artigos: ['o', 'a', 'os', 'as'],
+        complementos: ['calmamente', 'alegremente', 'silenciosamente', 'rapidamente', 'lentamente']
+      };
+
+      // Estruturas de frases dinâmicas
+      const estruturas = [
+        () => `${randomItem(conectores.locais)} ${elem1}, ${randomItem(conectores.artigos)} ${elem2} ${randomItem(conectores.conjuncoes)} ${randomItem(conectores.artigos)} ${elem3} ${candidateActionResult} ${randomItem(conectores.complementos)} ${randomItem(conectores.preposicoes)} ${randomItem(conectores.artigos)} ${predictedEmbeddingResult}.`,
+        
+        () => `${randomItem(conectores.temporais)} ${randomItem(conectores.artigos)} ${elem2} ${candidateActionResult}, ${randomItem(conectores.artigos)} ${elem3} observava ${randomItem(conectores.artigos)} ${elem1} ${randomItem(conectores.conjuncoes)} ${randomItem(conectores.artigos)} ${predictedEmbeddingResult}.`,
+        
+        () => `${randomItem(conectores.artigos).toUpperCase()} ${elem2} decidiu ${candidateActionResult} ${randomItem(conectores.complementos)} ${randomItem(conectores.preposicoes)} ${randomItem(conectores.artigos)} ${elem1}, ${randomItem(conectores.conjuncoes)} ${randomItem(conectores.artigos)} ${elem3} seguiu ${randomItem(conectores.preposicoes)} ${randomItem(conectores.artigos)} ${predictedEmbeddingResult}.`,
+        
+        () => `${randomItem(conectores.temporais)} ${randomItem(conectores.artigos)} tarde, ${randomItem(conectores.artigos)} ${elem2} ${randomItem(conectores.conjuncoes)} ${randomItem(conectores.artigos)} ${elem3} foram ${candidateActionResult} ${randomItem(conectores.complementos)} ${randomItem(conectores.preposicoes)} ${randomItem(conectores.artigos)} ${elem1} ${randomItem(conectores.conjuncoes)} ${randomItem(conectores.artigos)} ${predictedEmbeddingResult}.`
+      ];
+
+      // Função auxiliar para selecionar item aleatório de um array
+      function randomItem(array) {
+        return array[Math.floor(Math.random() * array.length)];
+      }
+
+      // Gera a frase usando uma estrutura aleatória
+      const sentence = randomItem(estruturas)();
+      
+      console.log('Conectores utilizados:', conectores);
+      console.log('Frase gerada:', sentence);
+      
+      document.getElementById('fullSentenceArea').textContent = sentence;
+    }
+
+    // Eventos dos botões
+    document.getElementById('generateContextBtn').addEventListener('click', () => {
+      generateRandomContext();
+      selectRandomTarget();
+      updateSentenceTemplate();
+      document.getElementById('trainingLog').textContent = "";
+      document.getElementById('predictionArea').textContent = "";
+      document.getElementById('candidateArea').textContent = "";
+      document.getElementById('fullSentenceArea').textContent = "";
+      // Limpa os resultados armazenados
+      predictedEmbeddingResult = "";
+      candidateActionResult = "";
+    });
+
+    document.getElementById('trainBtn').addEventListener('click', () => {
+      if (currentContext.length === 0) {
+        alert("Gere primeiro um contexto aleatório.");
+        return;
+      }
+      if (!targetWord) {
+        alert("Selecione uma palavra alvo.");
+        return;
+      }
+
+      // Simplifica o log para mostrar apenas o contexto e palavra alvo
+      let log = `Palavra alvo: ${targetWord}\nContexto: ${currentContext.join(', ')}`;
+      document.getElementById('trainingLog').textContent = log;
+
+      const iterations = [];
+      const lossValues = [];
+      
+      // Executa o treinamento e coleta os valores de loss
+      for (let i = 0; i < 100; i++) {
+        const { currentLoss, newLoss } = trainStep(currentContext, targetWord);
+        iterations.push(i + 1);
+        lossValues.push(newLoss);
+      }
+      
+      // Atualiza o gráfico
+      if (lossChart) {
+        lossChart.destroy();
+      }
+      
+      const ctx = document.getElementById('lossChart').getContext('2d');
+      lossChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: iterations,
+          datasets: [{
+            label: 'Loss por Iteração',
+            data: lossValues,
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.1,
+            fill: false,
+            pointRadius: 0 // Remove os pontos para uma linha mais limpa
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Evolução do Loss Durante o Treinamento',
+              font: {
+                size: 16
+              }
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: false,
+              title: {
+                display: true,
+                text: 'Loss'
+              }
+            },
+            x: {
+              title: {
+                display: true,
+                text: 'Iteração'
+              }
+            }
+          },
+          animation: {
+            duration: 1000,
+            easing: 'easeInOutQuart'
+          }
+        }
+      });
+    });
+
+    function safelyExecuteStep(step, errorMessage) {
+      try {
+        return step();
+      } catch (error) {
+        console.error(`Erro: ${error.message}`);
+        alert(errorMessage || 'Ocorreu um erro ao executar esta operação.');
+        return null;
+      }
+    }
+
+    document.getElementById('predictBtn').addEventListener('click', () => {
+      if (currentContext.length === 0) {
+        alert("Gere primeiro um contexto aleatório.");
+        return;
+      }
+      
+      safelyExecuteStep(() => {
+        predictedEmbeddingResult = predictNextWord(currentContext);
+        showResult('predictionArea', 
+          "Palavra prevista para o contexto (por embeddings): " + predictedEmbeddingResult);
+      }, "Erro ao prever a próxima palavra.");
+    });
+
+    document.getElementById('generateCandidateBtn').addEventListener('click', () => {
+      if (currentContext.length === 0) {
+        alert("Gere primeiro um contexto aleatório.");
+        return;
+      }
+      candidateActionResult = generateCandidateAction(currentContext);
+      document.getElementById('candidateArea').textContent = "Palavra candidata (construída a partir do contexto): " + candidateActionResult;
+    });
+
+    document.getElementById('generateFullSentenceBtn').addEventListener('click', () => {
+      generateFullSentence();
+    });
+
+    // Inicializa com um contexto aleatório ao carregar a página
+    generateRandomContext();
+    selectRandomTarget();
+
+    // No JavaScript, adicione feedback visual aos botões
+    function addButtonFeedback(buttonId) {
+      const button = document.getElementById(buttonId);
+      button.addEventListener('click', function() {
+        this.classList.add('button-active');
+        setTimeout(() => this.classList.remove('button-active'), 200);
+      });
+    }
+
+    // Aplique aos botões
+    ['generateContextBtn', 'trainBtn', 'predictBtn', 'generateCandidateBtn', 'generateFullSentenceBtn']
+      .forEach(addButtonFeedback);
+
+    // Adicione animação aos resultados
+    function showResult(elementId, content) {
+      const element = document.getElementById(elementId);
+      element.textContent = content;
+      element.classList.remove('result-fade');
+      void element.offsetWidth; // Força reflow
+      element.classList.add('result-fade');
+    }
+
+    // 1. Adicionar visualização dos embeddings
+    function visualizeEmbeddings() {
+        const similarities = {};
+        vocab.forEach(word1 => {
+            similarities[word1] = {};
+            vocab.forEach(word2 => {
+                if (word1 !== word2) {
+                    similarities[word1][word2] = dot(embeddings[word1], embeddings[word2]);
+                }
+            });
+        });
+
+        // Criar uma tabela de relações
+        let tableHTML = '<div class="similarities-table"><table>';
+        tableHTML += '<tr><th>Palavra</th><th>Palavras Relacionadas</th></tr>';
+        
+        Object.keys(similarities).forEach(word => {
+            const relatedWords = Object.entries(similarities[word])
+                .sort((a, b) => b[1] - a[1]) // Ordena por similaridade
+                .slice(0, 3) // Pega as 3 palavras mais similares
+                .map(([related, score]) => `${related} (${score.toFixed(2)})`)
+                .join(', ');
+                
+            tableHTML += `<tr>
+                <td><strong>${word}</strong></td>
+                <td>${relatedWords}</td>
+            </tr>`;
+        });
+        
+        tableHTML += '</table></div>';
+        
+        // Mostra a tabela em um elemento na página
+        const feedbackArea = document.getElementById('feedbackArea');
+        feedbackArea.innerHTML = tableHTML;
+        feedbackArea.className = 'feedback success';
+        
+        return similarities;
+    }
+
+    // 2. Adicionar explicação do processo de atenção
+    function demonstrateAttention(context) {
+        console.log('%c== Mecanismo de Atenção ==', 'color: #4CAF50; font-weight: bold');
+        
+        const attentionScores = {};
+        const contextVec = sumVectors(context.map(word => embeddings[word]));
+        
+        vocab.forEach(word => {
+            attentionScores[word] = dot(contextVec, embeddings[word]) / 
+                (Math.sqrt(dot(contextVec, contextVec)) * Math.sqrt(dot(embeddings[word], embeddings[word])));
+        });
+        
+        console.log('Scores de Atenção:', attentionScores);
+        return attentionScores;
+    }
+
+    function demonstrateTokenization(text) {
+        // Simplificado para demonstração
+        const tokens = text.toLowerCase().split(/[\s,.!?]+/);
+        console.log('Texto original:', text);
+        console.log('Tokens:', tokens);
+        return tokens;
+    }
+
+    function multiHeadAttention(context, numHeads = 2) {
+        const heads = [];
+        for (let i = 0; i < numHeads; i++) {
+            // Cada cabeça pode focar em aspectos diferentes do contexto
+            const attentionScores = demonstrateAttention(context);
+            heads.push(attentionScores);
+        }
+        return heads;
+    }
+
+    function predictWithTemperature(context, temperature = 1.0) {
+        const scores = {};
+        vocab.forEach(word => {
+            scores[word] = dot(sumVectors(context.map(w => embeddings[w])), embeddings[word]);
+        });
+        
+        // Aplicar temperatura
+        const scaledScores = {};
+        Object.keys(scores).forEach(word => {
+            scaledScores[word] = Math.exp(scores[word] / temperature);
+        });
+        
+        return scaledScores;
+    }
+
+    // Controle da barra flutuante
+    const floatingButtons = document.getElementById('floatingButtons');
+    let lastScrollTop = 0;
+
+    // Clone os event listeners para os botões flutuantes
+    document.getElementById('generateContextBtnFloat').addEventListener('click', () => {
+      document.getElementById('generateContextBtn').click();
+    });
+
+    document.getElementById('trainBtnFloat').addEventListener('click', () => {
+      document.getElementById('trainBtn').click();
+    });
+
+    document.getElementById('predictBtnFloat').addEventListener('click', () => {
+      document.getElementById('predictBtn').click();
+    });
+
+    document.getElementById('generateCandidateBtnFloat').addEventListener('click', () => {
+      document.getElementById('generateCandidateBtn').click();
+    });
+
+    document.getElementById('generateFullSentenceBtnFloat').addEventListener('click', () => {
+      document.getElementById('generateFullSentenceBtn').click();
+    });
+
+    // Controle de visibilidade baseado no scroll
+    window.addEventListener('scroll', () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const originalButtonsPos = document.querySelector('.section').getBoundingClientRect().top;
+      
+      // Mostra os botões flutuantes quando passar da seção original de botões
+      if (originalButtonsPos < 0) {
+        floatingButtons.classList.add('visible');
+        
+        // Controle de direção do scroll para esconder/mostrar
+        if (scrollTop > lastScrollTop) {
+          // Scrolling down
+          floatingButtons.style.transform = 'translateY(-100%)';
+        } else {
+          // Scrolling up
+          floatingButtons.style.transform = 'translateY(0)';
+        }
+      } else {
+        floatingButtons.classList.remove('visible');
+      }
+      
+      lastScrollTop = scrollTop;
+    });
+
+    // Aplica o feedback visual também aos botões flutuantes
+    ['generateContextBtnFloat', 'trainBtnFloat', 'predictBtnFloat', 
+     'generateCandidateBtnFloat', 'generateFullSentenceBtnFloat']
+      .forEach(addButtonFeedback);
+
+    function initializeInteractiveArea() {
+      const words = {
+        natureza: ['sol', 'lua', 'flor', 'árvore'],
+        animais: ['cachorro', 'gato', 'pássaro', 'borboleta'],
+        lugares: ['casa', 'jardim', 'parque', 'montanha']
+      };
+
+      const wordCards = document.getElementById('wordCards');
+      const allWords = [...words.natureza, ...words.animais, ...words.lugares];
+      
+      // Embaralha as palavras
+      allWords.sort(() => Math.random() - 0.5);
+      
+      // Cria os cartões de palavras
+      allWords.forEach(word => {
+        const card = document.createElement('div');
+        card.className = 'word-card';
+        card.textContent = word;
+        card.draggable = true;
+        
+        card.addEventListener('dragstart', (e) => {
+          e.target.classList.add('dragging');
+          e.dataTransfer.setData('text/plain', word);
+        });
+        
+        card.addEventListener('dragend', (e) => {
+          e.target.classList.remove('dragging');
+        });
+        
+        wordCards.appendChild(card);
+      });
+
+      // Configura as zonas de soltar
+      document.querySelectorAll('.drop-zone').forEach(zone => {
+        zone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          zone.classList.add('drag-over');
+        });
+
+        zone.addEventListener('dragleave', () => {
+          zone.classList.remove('drag-over');
+        });
+
+        zone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          zone.classList.remove('drag-over');
+          const word = e.dataTransfer.getData('text/plain');
+          const draggedCard = document.querySelector('.word-card.dragging');
+          
+          if (draggedCard) {
+            // Move o cartão em vez de criar um novo
+            zone.appendChild(draggedCard);
+          }
+          
+          // Atualiza a frase após o drop
+          updateSentenceTemplate();
+        });
+      });
+
+      // Verifica grupos
+      document.getElementById('checkGroupsBtn').addEventListener('click', () => {
+        const feedback = document.getElementById('feedbackArea');
+        let correct = true;
+        
+        document.querySelectorAll('.drop-zone').forEach(zone => {
+          const zoneWords = Array.from(zone.querySelectorAll('.word-card'))
+            .map(card => card.textContent);
+          
+          // Verifica se as palavras estão no grupo correto
+          // ... lógica de verificação ...
+        });
+
+        if (correct) {
+          feedback.className = 'feedback success';
+          feedback.textContent = 'Muito bem! Os grupos estão corretos!';
+        } else {
+          feedback.className = 'feedback error';
+          feedback.textContent = 'Algumas palavras parecem estar no grupo errado. Tente novamente!';
+        }
+      });
+
+      // Mostra relações de embeddings
+      document.getElementById('showEmbeddingsBtn').addEventListener('click', () => {
+        const similarities = visualizeEmbeddings();
+        // Mostra as relações visualmente
+        // ... código para visualizar as relações ...
+      });
+    }
+
+    // Inicializa a área interativa quando a página carregar
+    document.addEventListener('DOMContentLoaded', initializeInteractiveArea);
+
+    // Modifique a div da frase template
+    function updateSentenceTemplate() {
+        // Pega as palavras dos grupos correspondentes
+        const lugaresGroup = document.querySelector('#group3').querySelectorAll('.word-card');
+        const animaisGroup = document.querySelector('#group2').querySelectorAll('.word-card');
+        const naturezaGroup = document.querySelector('#group1').querySelectorAll('.word-card');
+
+        // Seleciona aleatoriamente uma palavra de cada grupo (se houver)
+        const lugar = lugaresGroup.length > 0 ? 
+            lugaresGroup[Math.floor(Math.random() * lugaresGroup.length)].textContent : '___';
+        const animal = animaisGroup.length > 0 ? 
+            animaisGroup[Math.floor(Math.random() * animaisGroup.length)].textContent : '___';
+        const natureza = naturezaGroup.length > 0 ? 
+            naturezaGroup[Math.floor(Math.random() * naturezaGroup.length)].textContent : '___';
+
+        const sentenceTemplate = document.querySelector('.sentence-template');
+        sentenceTemplate.innerHTML = `
+            "Na <div class="blank-space" data-type="lugar">${lugar}</div>, 
+            o <div class="blank-space" data-type="animal">${animal}</div> 
+            observa a <div class="blank-space" data-type="natureza">${natureza}</div>"
+        `;
+    }
+
+    // Adicione a chamada da função quando gerar novo contexto
+    document.getElementById('generateContextBtn').addEventListener('click', () => {
+        generateRandomContext();
+        selectRandomTarget();
+        updateSentenceTemplate(); // Atualiza o template com as novas palavras
+        // ... resto do código existente ...
+    });
+
+    // Também chame a função na inicialização
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeInteractiveArea();
+        updateSentenceTemplate();
+    });
+  </script>
+</body>
+</html>
